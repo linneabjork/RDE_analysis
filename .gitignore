@@ -1,1 +1,7 @@
-/run_analysisCV.ipynb
+*.ipynb
+
+ML01
+
+*.txt
+
+__pycache__

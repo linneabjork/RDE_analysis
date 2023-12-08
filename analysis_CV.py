@@ -61,3 +61,4 @@ def RHE_correction(voltage, background_matrix, parameters_dictionary):
 
     for i in range(len(background_matrix[0])):
         background_matrix[0][i] = background_matrix[0][i] - parameters_dictionary["reference"]
+    return voltage, background_matrix
