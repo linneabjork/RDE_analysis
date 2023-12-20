@@ -1,7 +1,11 @@
+# Jupyter notebooks
 *.ipynb
 
+# Data folder
 ML01
 
+# Text files
 *.txt
 
+# Output (irrelevant)
 __pycache__
