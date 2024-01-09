@@ -63,18 +63,18 @@ def get_parameters(path_parameters):
 
 # Correction to RHE potential with voltage as a list
 def RHE_correction(voltage, background_matrix, parameters_dictionary):
-    for e in voltage:
-        e = e - parameters_dictionary["reference"]
+    for i in range(len(voltage)):
+        voltage[i] = voltage[i] - parameters_dictionary["reference"]
 
-    for i in range(len(background_matrix[0])):
-        background_matrix[0][i] = (
-            background_matrix[0][i] - parameters_dictionary["reference"]
+    for i in range(len(background_matrix)):
+        background_matrix[i][0] = (
+            background_matrix[i][0] - parameters_dictionary["reference"]
         )
     return voltage, background_matrix
 
 
 # IR-drop correction. index is used to choose the correct column in background_parameters,
-# 2023-01-04: index is either 3 or 5
+# 2023-01-04: index is either 1, 3 or 5
 def ir_drop_correction(voltage, background_matrix, index, parameters_dictionary):
     for i in range(len(voltage)):
         voltage[i] = (
@@ -85,20 +85,18 @@ def ir_drop_correction(voltage, background_matrix, index, parameters_dictionary)
 
 # Subtracting background from current
 def background_correction_current(current, background_matrix, index):
-    for i, e in enumerate(current):
-        e = e - background_matrix[i][index]
+    for i in range(len(current)):
+        current[i] = current[i] - background_matrix[i][index]
     return current
 
 
-# Normalizing values to geometric surface area and mass
-def normalizing(voltage, current, parameters_dictionary):
+# Normalizing current values to geometric surface area and mass
+def normalizing(current, parameters_dictionary):
     mass = (
         parameters_dictionary["loading"] * parameters_dictionary["A_geo"]
     )  # mg/cm2 * cm2 = mg
 
-    mass_V = np.array(voltage) * 1000 / mass
     mass_I = np.array(current) * 1000 / mass
-    surface_V = np.array(voltage) * 1000 / parameters_dictionary["A_geo"]
     surface_I = np.array(current) * 1000 / parameters_dictionary["A_geo"]
 
-    return mass_V, mass_I, surface_V, surface_I
+    return mass_I, surface_I
