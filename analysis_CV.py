@@ -11,8 +11,8 @@ from itertools import zip_longest
 import csv
 
 
-# Extract voltage and current from data file
-def get_voltage_current(filepath):
+# Extract voltage and current from data file. index indicates how many lines of info to be removed
+def get_voltage_current(filepath, index):
     with open(filepath, "r") as file:
         data = file.readlines()
         i = 0
@@ -23,7 +23,7 @@ def get_voltage_current(filepath):
             data[i] = newline
             i += 1
 
-        del data[0:9]  # information about the measurement, remove from data
+        del data[0:index]  # information about the measurement, remove from data
 
         Vraw = []
         Iraw = []
@@ -36,21 +36,25 @@ def get_voltage_current(filepath):
 
 
 # Store the background measurement in a matrix where each column corresponds to one variable
-def get_background(path_background):
+def get_background(path_background, index):
     with open(path_background, "r") as file:
         background_data = file.readlines()
-
         i = 0
         for line in background_data:
             newline = line.rstrip("\n").rstrip("\t\t").split("\t")
             background_data[i] = newline
             i += 1
 
-        background_matrix = np.zeros((len(background_data), len(background_data[0])))
+        del background_data[0:index]
 
-        for i in range(len(background_data)):  # loop through rows first
-            for j in range(len(background_data[i])):
-                background_matrix[i][j] = float(background_data[i][j].replace(",", "."))
+        background_V = []
+        background_I = []
+        for i in range(len(background_data)):
+            background_V.insert(i, float(background_data[i][1].replace(",", ".")))
+            background_I.insert(i, float(background_data[i][2].replace(",", ".")))
+
+        background_matrix = np.transpose([background_V, background_I])
+
     return background_matrix
 
 
@@ -62,31 +66,34 @@ def get_parameters(path_parameters):
 
 
 # Correction to RHE potential with voltage as a list
-def RHE_correction(voltage, background_matrix, parameters_dictionary):
+def RHE_correction(voltage, parameters_dictionary):
     for i in range(len(voltage)):
-        voltage[i] = voltage[i] - parameters_dictionary["reference"]
+        voltage[i] = voltage[i] + parameters_dictionary["reference"]
+    return voltage
 
+
+def RHE_correction_background(background_matrix, parameters_dictionary):
     for i in range(len(background_matrix)):
         background_matrix[i][0] = (
-            background_matrix[i][0] - parameters_dictionary["reference"]
+            background_matrix[i][0] + parameters_dictionary["reference"]
         )
-    return voltage, background_matrix
+    return background_matrix
 
 
-# IR-drop correction. index is used to choose the correct column in background_parameters,
-# 2023-01-04: index is either 1, 3 or 5
-def ir_drop_correction(voltage, background_matrix, index, parameters_dictionary):
+# IR-drop correction
+def ir_drop_correction(voltage, background_matrix, parameters_dictionary):
     for i in range(len(voltage)):
         voltage[i] = (
-            voltage[i] - background_matrix[i][index] * parameters_dictionary["ir_comp"]
+            voltage[i]
+            - background_matrix[i][1] * parameters_dictionary["ir_comp"]  # U=R*I
         )
     return voltage
 
 
 # Subtracting background from current
-def background_correction_current(current, background_matrix, index):
+def background_correction_current(current, background_matrix):
     for i in range(len(current)):
-        current[i] = current[i] - background_matrix[i][index]
+        current[i] = current[i] - background_matrix[i][1]
     return current
 
 
@@ -96,7 +103,7 @@ def normalizing(current, parameters_dictionary):
         parameters_dictionary["loading"] * parameters_dictionary["A_geo"]
     )  # mg/cm2 * cm2 = mg
 
-    mass_I = np.array(current) * 1000 / mass
-    surface_I = np.array(current) * 1000 / parameters_dictionary["A_geo"]
+    mass_I = np.array(current) * 1000 / mass  # current values in mA
+    surface_I = np.array(current) * 1000 / parameters_dictionary["A_geo"]  # mA/cm2
 
     return mass_I, surface_I
