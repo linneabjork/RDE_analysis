@@ -103,7 +103,7 @@ def normalizing(current, parameters_dictionary):
         parameters_dictionary["loading"] * parameters_dictionary["A_geo"]
     )  # mg/cm2 * cm2 = mg
 
-    mass_I = np.array(current) * 1000 / mass  # current values in mA
+    mass_I = np.array(current) * 1000 / mass
     surface_I = np.array(current) * 1000 / parameters_dictionary["A_geo"]  # mA/cm2
 
     return mass_I, surface_I
