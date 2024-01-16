@@ -25,14 +25,15 @@ def get_voltage_current(filepath, index):
 
         del data[0:index]  # information about the measurement, remove from data
 
-        Vraw = []
-        Iraw = []
+        V_raw = []
+        I_raw = []
         for i in range(len(data)):
-            Vraw.insert(
+            V_raw.insert(
                 i, float(data[i][1].replace(",", "."))
             )  # string to float. Use "."as decimal sign
-            Iraw.insert(i, float(data[i][2].replace(",", ".")))
-    return Vraw, Iraw
+            I_raw.insert(i, float(data[i][2].replace(",", ".")))
+
+    return V_raw, I_raw
 
 
 # Store the background measurement in a matrix where each column corresponds to one variable
@@ -66,26 +67,26 @@ def get_parameters(path_parameters):
 
 
 # Correction to RHE potential with voltage as a list
-def RHE_correction(voltage, parameters_dictionary):
+def RHE_correction(voltage, reference):
     for i in range(len(voltage)):
-        voltage[i] = voltage[i] + parameters_dictionary["reference"]
+        voltage[i] = voltage[i] + reference
     return voltage
 
 
-def RHE_correction_background(background_matrix, parameters_dictionary):
-    for i in range(len(background_matrix)):
-        background_matrix[i][0] = (
-            background_matrix[i][0] + parameters_dictionary["reference"]
-        )
+def RHE_correction_background(background_matrix, reference):
+    for j in range(len(background_matrix[0])):
+        if j % 2 == 0:
+            for i in range(len(background_matrix)):
+                background_matrix[i][j] = background_matrix[i][j] + reference
     return background_matrix
 
 
 # IR-drop correction
-def ir_drop_correction(voltage, background_matrix, parameters_dictionary):
+def ir_drop_correction(voltage, background_matrix, ir_comp):
     for i in range(len(voltage)):
         voltage[i] = (
             voltage[i]
-            - background_matrix[i][1] * parameters_dictionary["ir_comp"]  # U=R*I
+            - background_matrix[i][1] * ir_comp  # U=R*I
         )
     return voltage
 
@@ -98,12 +99,10 @@ def background_correction_current(current, background_matrix):
 
 
 # Normalizing current values to geometric surface area and mass
-def normalizing(current, parameters_dictionary):
-    mass = (
-        parameters_dictionary["loading"] * parameters_dictionary["A_geo"]
-    )  # mg/cm2 * cm2 = mg
+def normalizing(current, loading, A_geo):
+    mass = loading * A_geo  # mg/cm2 * cm2 = mg
 
     mass_I = np.array(current) * 1000 / mass
-    surface_I = np.array(current) * 1000 / parameters_dictionary["A_geo"]  # mA/cm2
+    surface_I = np.array(current) * 1000 / A_geo  # mA/cm2
 
     return mass_I, surface_I
