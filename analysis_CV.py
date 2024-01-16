@@ -83,18 +83,19 @@ def RHE_correction_background(background_matrix, reference):
 
 # IR-drop correction
 def ir_drop_correction(voltage, background_matrix, ir_comp):
-    for i in range(len(voltage)):
-        voltage[i] = (
-            voltage[i]
-            - background_matrix[i][1] * ir_comp  # U=R*I
-        )
+    for j in range(len(background_matrix[0])):
+        if j % 2 == 0:
+            for i in range(len(voltage)):
+                voltage[i] = voltage[i] - background_matrix[i][j] * ir_comp  # U=R*I
     return voltage
 
 
 # Subtracting background from current
 def background_correction_current(current, background_matrix):
-    for i in range(len(current)):
-        current[i] = current[i] - background_matrix[i][1]
+    for j in range(len(background_matrix[0])):
+        if j % 2 != 0:
+            for i in range(len(current)):
+                current[i] = current[i] - (background_matrix[i][j])
     return current
 
 
