@@ -54,9 +54,7 @@ def get_background(path_background, index):
             background_V.insert(i, float(background_data[i][1].replace(",", ".")))
             background_I.insert(i, float(background_data[i][2].replace(",", ".")))
 
-        background_matrix = np.transpose([background_V, background_I])
-
-    return background_matrix
+    return background_V, background_I
 
 
 # Store the measurement parameters in a dictionary
@@ -82,22 +80,17 @@ def RHE_correction_background(background_matrix, reference):
 
 
 # IR-drop correction
-def ir_drop_correction(voltage, background_matrix, ir_comp):
-    for j in range(len(background_matrix[0])):
-        if j % 2 == 0:
-            for i in range(len(voltage)):
-                voltage[i] = voltage[i] - background_matrix[i][j] * ir_comp  # U=R*I
+def ir_drop_correction(voltage, background_V, ir_comp):
+    for i in range(len(voltage)):
+        voltage[i] = voltage[i] - background_V[i] * ir_comp  # U=R*I
     return voltage
 
 
 # Subtracting background from current
-def background_correction_current(current, background_matrix):
-    for j in range(len(background_matrix[0])):
-        if j % 2 != 0:
-            for i in range(len(current)):
-                current[i] = current[i] - (background_matrix[i][j])
+def background_correction_current(current, background_I):
+    for i in range(len(current)):
+        current[i] = current[i] - background_I[i]
     return current
-
 
 # Normalizing current values to geometric surface area and mass
 def normalizing(current, loading, A_geo):
