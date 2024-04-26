@@ -61,11 +61,28 @@ def get_background(path_background, index):
     return background_V, background_I
 
 
-# Store the measurement parameters in a dictionary
-def get_parameters(path_parameters):
-    with open(path_parameters, "r") as file:
-        parameters_dictionary = json.loads(file.read())
-    return parameters_dictionary
+# Checking the potential of the reference electrode.
+def reference_check(voltage, current, x_lower_limit, x_upper_limit):
+    zero_current_x = np.linspace(x_lower_limit, x_upper_limit, len(voltage))
+    zero_current_y = np.linspace(0, 0, len(current))
+
+    intersection_indices = np.argwhere(
+        np.diff(np.sign(current - zero_current_y))
+    ).flatten()
+    ref_potential_forward = voltage[intersection_indices[0]]
+    ref_potential_backward = voltage[intersection_indices[1]]
+
+    print("Shift by", ref_potential_forward, "V.")
+    reference = np.abs(ref_potential_forward)
+
+    plt.plot(voltage, current)
+    plt.plot(zero_current_x, zero_current_y)
+    plt.plot(ref_potential_forward, current[intersection_indices[0]], "x")
+    plt.xlabel("E [V]")
+    plt.ylabel("I [mA]")
+    plt.title("Reference check")
+
+    return reference
 
 
 # Correction to RHE potential with voltage as a list
@@ -84,9 +101,9 @@ def RHE_correction_background(background_matrix, reference):
 
 
 # IR-drop correction
-def ir_drop_correction(voltage, background_V, ir_comp):
+def ir_drop_correction(voltage, current, ir_comp):
     for i in range(len(voltage)):
-        voltage[i] = voltage[i] - background_V[i] * ir_comp  # U=R*I
+        voltage[i] = voltage[i] - current[i] * ir_comp  # U=R*I
     return voltage
 
 
@@ -105,6 +122,7 @@ def normalizing(current, loading, A_geo):
     surface_I = np.array(current) / A_geo  # mA/cm2
 
     return mass_I, surface_I
+
 
 class ECSA_calculation:
     def __init__(self, V_RHE, I, background_V_RHE, background_I):
@@ -136,13 +154,18 @@ class ECSA_calculation:
         x_DL_start = next(x for x in self.V_RHE if x >= DL_start)
         x_DL_end = next(x for x in self.V_RHE if x >= DL_end)
         x_DL = [x_DL_start, x_DL_end]
-        y_DL = [self.background_I[self.V_RHE.index(x_DL_start)], self.background_I[self.V_RHE.index(x_DL_end)]]
+        y_DL = [
+            self.background_I[self.V_RHE.index(x_DL_start)],
+            self.background_I[self.V_RHE.index(x_DL_end)],
+        ]
         baseline_coefficients_DL = np.polyfit(x_DL, y_DL, 1)
         baseline_DL = np.poly1d(baseline_coefficients_DL)
         self.x_axis = np.linspace(V_lower, V_upper, len(self.background_V_RHE))
         self.y_axis = baseline_DL(self.x_axis)
 
-        self.intersection_index = np.argwhere(np.diff(np.sign(self.background_I - self.y_axis))).flatten()
+        self.intersection_index = np.argwhere(
+            np.diff(np.sign(self.background_I - self.y_axis))
+        ).flatten()
 
         # Finding lower limit for CO peak
         CO_first_x = next(x for x in self.V_RHE if x >= DL_end)
@@ -161,8 +184,8 @@ class ECSA_calculation:
                 self.CO_lower_index = i
                 break
 
-        # Idea: two integrations, one each for the CO peak and the HUPD region. 
-        # Create a respective baseline (straight line) to be subtracted from the 
+        # Idea: two integrations, one each for the CO peak and the HUPD region.
+        # Create a respective baseline (straight line) to be subtracted from the
         # current to get the respective charges and so the ECSA.
 
         CO_start_x = self.V_RHE[self.CO_lower_index]
@@ -183,7 +206,9 @@ class ECSA_calculation:
                 self.V_CO.append(self.V_RHE[i])
                 background_I_CO.append(self.background_I[i])
                 background_V_CO.append(self.background_V_RHE[i])
-            if self.background_I[i] >= hupd_start_y and (hupd_start_x <= self.V_RHE[i] <= hupd_end_x):
+            if self.background_I[i] >= hupd_start_y and (
+                hupd_start_x <= self.V_RHE[i] <= hupd_end_x
+            ):
                 self.I_hupd.append(self.I[i])
                 self.V_hupd.append(self.V_RHE[i])
                 self.background_I_hupd.append(self.background_I[i])
@@ -207,7 +232,9 @@ class ECSA_calculation:
 
         self.I_difference_hupd = []
         for i in range(len(self.I_hupd)):
-            self.I_difference_hupd.append(self.background_I_hupd[i] - self.y_axis_hupd[i])
+            self.I_difference_hupd.append(
+                self.background_I_hupd[i] - self.y_axis_hupd[i]
+            )
 
         # Integrating
         charge1 = 0.001 * np.trapz(
@@ -225,24 +252,41 @@ class ECSA_calculation:
         specific_ECSA_hupd = ECSA_hupd / Pt_mass * 100  # m2/g(Pt)
 
         print(
-            "ECSA CO stripping:", ECSA_CO,"cm2" 
-            "\tSpecific ECSA CO stripping:", specific_ECSA_CO,"m2/g(Pt)" 
-            "\nECSA HUPD:",ECSA_hupd,"cm2"
-            "\t\tSpecific ECSA HUPD:", specific_ECSA_hupd,"m2/g(Pt)",
-            "\n\t\t---------------------------------------------------------"
+            "Specific ECSA CO str:",
+            specific_ECSA_CO,
+            "m2/g(Pt) \tECSA CO str:",
+            ECSA_CO,
+            "cm2 \nSpecific ECSA HUPD:  ",
+            specific_ECSA_hupd,
+            "m2/g(Pt) \tECSA HUPD:",
+            ECSA_hupd,
+            "cm2"
+            "\n\t-------------------------------------------------------------------",
         )
 
-        ECSAs = [ECSA_CO, ECSA_hupd]   #cm2
-        specific_ECSAs = [specific_ECSA_CO, specific_ECSA_hupd]   #m2/g(Pt)
+        specific_ECSAs = [specific_ECSA_CO, specific_ECSA_hupd]
+        ECSAs = [ECSA_CO, ECSA_hupd]  # m2/g(Pt)
 
-        return ECSAs, specific_ECSAs
+        return specific_ECSAs, ECSAs
 
     def plotting(self):
         plt.plot(self.V_RHE, self.I, label="CO stripping")
-        plt.plot(self.background_V_RHE, self.background_I, label="CV after CO stripping")
+        plt.plot(
+            self.background_V_RHE, self.background_I, label="CV after CO stripping"
+        )
         plt.plot(self.x_axis, self.y_axis, label="Baseline")
-        plt.plot(self.x_axis[self.intersection_index[0]], self.background_I[self.intersection_index[0]], "x", label="Intersection")
-        plt.plot(self.V_RHE[self.CO_lower_index], self.I[self.CO_lower_index], "x", label="Start of CO peak")
+        plt.plot(
+            self.x_axis[self.intersection_index[0]],
+            self.background_I[self.intersection_index[0]],
+            "x",
+            label="Intersection",
+        )
+        plt.plot(
+            self.V_RHE[self.CO_lower_index],
+            self.I[self.CO_lower_index],
+            "x",
+            label="Start of CO peak",
+        )
         plt.xlabel("E vs. RHE [V]")
         plt.ylabel("i [mA]")
         plt.legend()
@@ -265,59 +309,62 @@ class ECSA_calculation:
         ax2.fill_between(self.V_hupd, self.I_difference_hupd, label="Integrated area")
         ax2.legend()
         ax2.set_xlabel("E vs. RHE [V]")
-        ax2.set_ylabel( "i [mA]")
+        ax2.set_ylabel("i [mA]")
         ax2.set_title("HUPD region")
-    
 
-def obtain_activities(diffusion_voltage, kinetic_voltage, corrected_data_RHE, ECSAs, Pt_mass):
+
+def obtain_activities(
+    diffusion_voltage, kinetic_voltage, corrected_data_RHE, ECSAs, Pt_mass, A_geo
+):
     # Extracting I and I_d (in mA)
     forward_sweeps = copy.deepcopy(corrected_data_RHE)
-    switch_voltage = np.max(forward_sweeps[:,4])   #1600 rpm as reference
-    switch_voltage_index = list(forward_sweeps[:,4]).index(switch_voltage)
+    switch_voltage = np.max(forward_sweeps[:, 4])  # 1600 rpm as reference
+    switch_voltage_index = list(forward_sweeps[:, 4]).index(switch_voltage)
 
     V_forward_sweeps = []
     I_forward_sweeps = []
     for i in range(len(forward_sweeps[0])):
         if i % 2 == 0:
-                V_forward_sweeps.append((forward_sweeps[0:switch_voltage_index,i]))
-        else: 
-                I_forward_sweeps.append((forward_sweeps[0:switch_voltage_index,i]))
+            V_forward_sweeps.append((forward_sweeps[0:switch_voltage_index, i]))
+        else:
+            I_forward_sweeps.append((forward_sweeps[0:switch_voltage_index, i]))
     V_forward_sweeps = np.transpose(V_forward_sweeps)
     I_forward_sweeps = np.transpose(I_forward_sweeps)
 
-    V09_index = []
-    I_measured = []        
+    # V09_index = []
+    I_measured = []
     I_d = []
     for i in range(len(V_forward_sweeps[0])):
-        V_list = list(V_forward_sweeps[:,i])
+        V_list = list(V_forward_sweeps[:, i])
         V09_elm = next(x for x in V_list if x >= kinetic_voltage)
         V09_index = V_list.index(V09_elm)
         V04_elm = next(x for x in V_list if x >= diffusion_voltage)
         V04_index = V_list.index(V04_elm)
 
-        I_list = list(I_forward_sweeps[:,i])
+        I_list = list(I_forward_sweeps[:, i])
         I_measured.append(I_list[V09_index])
         I_d.append(I_list[V04_index])
 
     I_k = []
     for i in range(len(I_measured)):
-        elm = I_measured[i]*I_d[i]/(I_d[i]-I_measured[i])
+        elm = (I_measured[i] * I_d[i]) / (I_d[i] - I_measured[i])
         I_k.append(np.abs(elm))
         I_d[i] = np.abs(I_d[i])
 
-    print('Diffusion limiting current at', diffusion_voltage,'and 1600 rpm V [mA]:'
-        '\n', I_d[2])
+    print(
+        "Diffusion limiting current at",
+        diffusion_voltage,
+        "and 1600 rpm V [mA]:" "\n",
+        I_d[2],
+    )
 
-    SA_CO = [i for i in I_k]/(ECSAs[0])
-    print('\nSpecific activity (CO) at 0.9 V and 1600 rpm [mA/cm2]:'
-        '\n', SA_CO[2])
+    SA_CO = [i / (ECSAs[0] / 100) for i in I_k]  # ECSAs[0]
+    print("\nSpecific activity (CO) at 0.9 V and 1600 rpm [mA/cm2]:" "\n", SA_CO[2])
 
-    SA_hupd = [i for i in I_k]/(ECSAs[1])
-    print('\nSpecific activity (HUPD) at 0.9 V and 1600 rpm [mA/cm2]:'
-        '\n', SA_hupd[2])
+    SA_hupd = [i / (ECSAs[1] / 100) for i in I_k]  # ECSAs[1]
+    print("\nSpecific activity (HUPD) at 0.9 V and 1600 rpm [mA/cm2]:" "\n", SA_hupd[2])
 
-    MA = np.abs([i for i in I_k]) / (Pt_mass)
-    print('\n Mass activity at 0.9 V and 1600 rpm [mA/ug(Pt)]:'
-        '\n', MA[2])
+    MA = [i * (ECSAs[0] / 100) for i in SA_CO]
+    print("\n Mass activity at 0.9 V and 1600 rpm [mA/ug(Pt)]:" "\n", MA[2])
 
-    return SA_CO, SA_hupd, MA 
+    return I_d, I_k, SA_CO, SA_hupd, MA
