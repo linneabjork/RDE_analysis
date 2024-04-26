@@ -101,9 +101,9 @@ def RHE_correction_background(background_matrix, reference):
 
 
 # IR-drop correction
-def ir_drop_correction(voltage, current, ir_comp):
+def ir_drop_correction(voltage, background_I, ir_comp):
     for i in range(len(voltage)):
-        voltage[i] = voltage[i] - current[i] * ir_comp  # U=R*I
+        voltage[i] = voltage[i] - background_I[i] * ir_comp  # U=R*I
     return voltage
 
 
@@ -314,7 +314,7 @@ class ECSA_calculation:
 
 
 def obtain_activities(
-    diffusion_voltage, kinetic_voltage, corrected_data_RHE, ECSAs, Pt_mass, A_geo
+    diffusion_voltage, kinetic_voltage, corrected_data_RHE, specific_ECSAs
 ):
     # Extracting I and I_d (in mA)
     forward_sweeps = copy.deepcopy(corrected_data_RHE)
@@ -358,13 +358,13 @@ def obtain_activities(
         I_d[2],
     )
 
-    SA_CO = [i / (ECSAs[0] / 100) for i in I_k]  # ECSAs[0]
+    SA_CO = [i / (specific_ECSAs[0] / 100) for i in I_k]  # ECSAs[0]
     print("\nSpecific activity (CO) at 0.9 V and 1600 rpm [mA/cm2]:" "\n", SA_CO[2])
 
-    SA_hupd = [i / (ECSAs[1] / 100) for i in I_k]  # ECSAs[1]
+    SA_hupd = [i / (specific_ECSAs[1] / 100) for i in I_k]  # ECSAs[1]
     print("\nSpecific activity (HUPD) at 0.9 V and 1600 rpm [mA/cm2]:" "\n", SA_hupd[2])
 
-    MA = [i * (ECSAs[0] / 100) for i in SA_CO]
+    MA = [i * (specific_ECSAs[0] / 100) for i in SA_CO]
     print("\n Mass activity at 0.9 V and 1600 rpm [mA/ug(Pt)]:" "\n", MA[2])
 
     return I_d, I_k, SA_CO, SA_hupd, MA
