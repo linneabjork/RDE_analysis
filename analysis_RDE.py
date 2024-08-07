@@ -1,4 +1,5 @@
-# Python script to automatize analysis of stability and activity measurements
+# Python script to automatize analysis of stability and activity
+# measurements. 
 
 # import of modules
 import numpy as np
@@ -354,7 +355,7 @@ def obtain_activities(
     print(
         "Diffusion limiting current at",
         diffusion_voltage,
-        "and 1600 rpm V [mA]:" "\n",
+        "V and 1600 rpm V [mA]:" "\n",
         I_d[2],
     )
 
