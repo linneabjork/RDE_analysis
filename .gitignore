@@ -3,6 +3,14 @@ ML01
 
 # Text files
 *.txt
+*.csv
 
 # Output (irrelevant)
 __pycache__
+
+test_w_class
+
+# Notebooks
+kladd.ipynb
+testrun.ipynb
+reference_plots.ipynb
